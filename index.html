@@ -1,0 +1,208 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0f1216">
+<title>MP3 Player</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon.svg">
+<style>
+:root{--bg:#0f1216;--card:#171b21;--alt:#1f252d;--tx:#e9edf2;--tx2:#95a1ae;--bd:#2c343e;--ac:#64748b;--acd:#334155;--act:#94a3b8}
+:root[data-theme=light]{--bg:#f3f4f6;--card:#fff;--alt:#f0f2f5;--tx:#1d2430;--tx2:#5d6875;--bd:#d9dee5;--ac:#475569;--acd:#334155;--act:#475569}
+@media (prefers-color-scheme:light){:root[data-theme=auto]{--bg:#f3f4f6;--card:#fff;--alt:#f0f2f5;--tx:#1d2430;--tx2:#5d6875;--bd:#d9dee5;--ac:#475569;--acd:#334155;--act:#475569}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--tx);font:15px/1.45 "Segoe UI",system-ui,-apple-system,Roboto,sans-serif;-webkit-tap-highlight-color:transparent}
+.wrap{max-width:640px;margin:0 auto;padding:12px 16px calc(16px + env(safe-area-inset-bottom))}
+.card{background:var(--card);border:1px solid var(--bd);border-radius:14px;padding:14px;margin-bottom:12px}
+.top{display:flex;align-items:center;gap:8px;margin-bottom:12px}
+.top h1{font-size:22px;font-weight:800;margin:0;flex:1}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:40px;min-width:40px;padding:0 10px;border:1.5px solid var(--ac);border-radius:10px;background:transparent;color:var(--act);font:inherit;font-weight:700;cursor:pointer}
+.btn:hover{background:var(--alt)}
+.btn svg{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.btn.big{min-height:64px;min-width:64px;border-radius:50%;border-width:2px}
+.btn.big svg{width:30px;height:30px}
+.btn small{font-size:12px;font-weight:700}
+.now{font-weight:800;font-size:17px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sub{color:var(--tx2);font-size:13px}
+.ctrl{display:flex;justify-content:center;align-items:center;gap:10px;margin:12px 0 4px}
+input[type=range]{width:100%;accent-color:var(--ac);height:28px;margin:0}
+.times{display:flex;justify-content:space-between;color:var(--tx2);font-size:13px;font-variant-numeric:tabular-nums}
+.lbl{font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--act);margin:0 0 8px}
+.pills{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.pill{min-height:34px;padding:0 12px;border-radius:999px;border:1px solid var(--bd);background:transparent;color:var(--tx);font:inherit;font-size:13px;font-weight:600;cursor:pointer}
+.pill.on{border:2px solid var(--ac);color:var(--act)}
+.spd{font-weight:800;min-width:52px;text-align:center;font-variant-numeric:tabular-nums}
+.row{display:flex;align-items:center;gap:10px}
+ul{list-style:none;margin:0;padding:0}
+li{display:flex;gap:10px;padding:10px 4px;border-top:1px solid var(--bd);cursor:pointer;align-items:center}
+li:first-child{border-top:0}
+li span{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+li.cur{color:var(--act);font-weight:800}
+li .x{border:0;background:none;color:var(--tx2);cursor:pointer;font-size:18px;padding:0 6px}
+.hint{color:var(--tx2);font-size:13px;text-align:center;padding:18px 0;border:1px dashed var(--bd);border-radius:10px}
+.drop{outline:2px dashed var(--ac);outline-offset:-6px}
+dialog{background:var(--card);color:var(--tx);border:1px solid var(--bd);border-radius:14px;padding:16px;max-width:360px;width:calc(100% - 32px)}
+dialog::backdrop{background:#0008}
+dialog .lbl{margin-top:12px}
+@media (pointer:fine){.btn{min-height:34px;min-width:34px}.btn.big{min-height:56px;min-width:56px}.pill{min-height:30px}}
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute">
+ <symbol id="play" viewBox="0 0 24 24"><path d="M7 4l13 8-13 8z"/></symbol>
+ <symbol id="pause" viewBox="0 0 24 24"><path d="M8 4v16M16 4v16"/></symbol>
+ <symbol id="prev" viewBox="0 0 24 24"><path d="M6 5v14M19 5l-10 7 10 7z"/></symbol>
+ <symbol id="next" viewBox="0 0 24 24"><path d="M18 5v14M5 5l10 7-10 7z"/></symbol>
+ <symbol id="back" viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 3-6.7M3 4v5h5"/></symbol>
+ <symbol id="fwd" viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-3-6.7M21 4v5h-5"/></symbol>
+ <symbol id="open" viewBox="0 0 24 24"><path d="M3 7h6l2 2h10v10H3zM12 12v5M9.5 14.5h5"/></symbol>
+ <symbol id="gear" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1L7 17M17 7l2.1-2.1"/></symbol>
+ <symbol id="vol" viewBox="0 0 24 24"><path d="M4 9h4l5-4v14l-5-4H4zM16 9a4 4 0 0 1 0 6"/></symbol>
+ <symbol id="shuf" viewBox="0 0 24 24"><path d="M3 6h4l10 12h4M3 18h4l3-3.6M14 9.6L17 6h4M18 3l3 3-3 3M18 15l3 3-3 3"/></symbol>
+ <symbol id="rep" viewBox="0 0 24 24"><path d="M4 11V8h14l-3-3M20 13v3H6l3 3"/></symbol>
+</svg>
+<div class="wrap" id="app">
+ <div class="top">
+  <h1>MP3 Player</h1>
+  <button class="btn" id="openBtn" title="Open files"><svg><use href="#open"/></svg></button>
+  <button class="btn" id="setBtn" title="Settings"><svg><use href="#gear"/></svg></button>
+  <input type="file" id="file" accept="audio/*,.mp3,.m4a,.wav,.ogg,.flac" multiple hidden>
+ </div>
+
+ <div class="card">
+  <div class="now" id="title">No track loaded</div>
+  <div class="sub" id="pos">Open files or drop them here</div>
+  <input type="range" id="seek" min="0" max="0" step="0.1" value="0" aria-label="Seek">
+  <div class="times"><span id="cur">0:00</span><span id="dur">0:00</span></div>
+  <div class="ctrl">
+   <button class="btn" id="prevBtn" title="Previous track"><svg><use href="#prev"/></svg></button>
+   <button class="btn" id="backBtn" title="Back"><svg><use href="#back"/></svg><small class="sk">5</small></button>
+   <button class="btn big" id="playBtn" title="Play / pause (Space)"><svg><use href="#play" id="playIco"/></svg></button>
+   <button class="btn" id="fwdBtn" title="Forward"><small class="sk">5</small><svg><use href="#fwd"/></svg></button>
+   <button class="btn" id="nextBtn" title="Next track"><svg><use href="#next"/></svg></button>
+  </div>
+  <div class="row" style="margin-top:8px">
+   <button class="btn" id="shufBtn" title="Shuffle"><svg><use href="#shuf"/></svg></button>
+   <button class="btn" id="repBtn" title="Repeat: off"><svg><use href="#rep"/></svg><small id="repTxt"></small></button>
+   <svg width="20" height="20" style="stroke:var(--tx2);fill:none;stroke-width:2;flex:none" title="Volume"><use href="#vol"/></svg>
+   <input type="range" id="vol" min="0" max="1" step="0.01" value="1" aria-label="Volume">
+  </div>
+ </div>
+
+ <div class="card">
+  <div class="lbl">Speed</div>
+  <div class="pills" id="speeds">
+   <button class="btn" id="slower" title="Slower 0.05x">−</button>
+   <span class="spd" id="spdTxt">1.00x</span>
+   <button class="btn" id="faster" title="Faster 0.05x">+</button>
+  </div>
+ </div>
+
+ <div class="card">
+  <ul id="list"></ul>
+  <div class="hint" id="empty">Playlist is empty. Tap the folder button or drop mp3s here.</div>
+ </div>
+</div>
+
+<dialog id="dlg">
+ <div class="row"><b style="flex:1;font-size:17px">Settings</b><button class="btn" id="closeDlg" title="Close">✕</button></div>
+ <div class="lbl">Skip amount (seconds)</div>
+ <div class="pills" id="skips"></div>
+ <div class="lbl">Theme</div>
+ <div class="pills" id="themes"></div>
+ <p class="sub" style="margin-top:14px">Bluetooth and headphone next and previous buttons skip forward and back by the skip amount. Keyboard: Space play, ← → skip, Shift+← → change track, [ ] speed.</p>
+</dialog>
+
+<script>
+const $=id=>document.getElementById(id), a=new Audio();
+const LS={get(k,d){try{const v=localStorage.getItem('mp3.'+k);return v==null?d:JSON.parse(v)}catch{return d}},set(k,v){try{localStorage.setItem('mp3.'+k,JSON.stringify(v))}catch{}}};
+let list=[], idx=-1, skip=LS.get('skip',5), speed=LS.get('speed',1), shuffle=LS.get('shuffle',false), rep=LS.get('rep',0), theme=LS.get('theme','dark'), positions=LS.get('pos',{});
+a.preservesPitch=true; a.volume=LS.get('vol',1); $('vol').value=a.volume;
+
+const fmt=s=>{s=Math.max(0,Math.floor(s||0));const h=Math.floor(s/3600),m=Math.floor(s/60)%60,x=String(s%60).padStart(2,'0');return h?`${h}:${String(m).padStart(2,'0')}:${x}`:`${m}:${x}`};
+const name=f=>f.name.replace(/\.[^.]+$/,'');
+
+function pills(el,vals,cur,lab,fn){el.querySelectorAll('.pill').forEach(p=>p.remove());vals.forEach(v=>{const b=document.createElement('button');b.className='pill'+(v==cur?' on':'');b.textContent=lab(v);b.onclick=()=>fn(v);el.appendChild(b)})}
+
+function setTheme(t){theme=t;LS.set('theme',t);document.documentElement.dataset.theme=t;pills($('themes'),['dark','light','auto'],t,v=>({dark:'Dark',light:'Light',auto:'Follow device'})[v],setTheme)}
+function setSkip(s){skip=s;LS.set('skip',s);document.querySelectorAll('.sk').forEach(e=>e.textContent=s);$('backBtn').title=`Back ${s} sec (←)`;$('fwdBtn').title=`Forward ${s} sec (→)`;pills($('skips'),[5,10,15,30,60],s,v=>v,setSkip)}
+function setSpeed(s){speed=Math.min(4,Math.max(.25,Math.round(s*100)/100));a.playbackRate=speed;LS.set('speed',speed);$('spdTxt').textContent=speed.toFixed(2)+'x';pills($('speeds'),[.75,1,1.2,1.5,1.75,2],speed,v=>v+'x',setSpeed);posState()}
+function setShuffle(v){shuffle=v;LS.set('shuffle',v);$('shufBtn').style.opacity=v?1:.45;$('shufBtn').title='Shuffle: '+(v?'on':'off')}
+function setRep(v){rep=v;LS.set('rep',v);$('repBtn').style.opacity=v?1:.45;$('repTxt').textContent=v==2?'1':'';$('repBtn').title='Repeat: '+['off','all','one'][v]}
+
+function seekBy(d){if(!a.src)return;a.currentTime=Math.min(Math.max(0,a.currentTime+d),a.duration||0);tick()}
+function savePos(){if(idx<0)return;const n=list[idx].name;positions[n]=a.currentTime;LS.set('pos',positions);LS.set('last',n)}
+function load(i,play=true){
+ if(i<0||i>=list.length)return; savePos(); idx=i; const f=list[i];
+ if(a.src)URL.revokeObjectURL(a.src);
+ a.src=URL.createObjectURL(f); a.playbackRate=speed;
+ const p=positions[f.name]; if(p>2) a.addEventListener('loadedmetadata',()=>{if(p<a.duration-2)a.currentTime=p},{once:true});
+ $('title').textContent=name(f); $('pos').textContent=`Track ${i+1} of ${list.length}`;
+ if('mediaSession' in navigator) navigator.mediaSession.metadata=new MediaMetadata({title:name(f),artist:'MP3 Player'});
+ LS.set('last',f.name); render(); if(play) a.play().catch(()=>{});
+}
+function step(d){if(!list.length)return;let i;if(shuffle&&list.length>1){do i=Math.floor(Math.random()*list.length);while(i==idx)}else i=idx+d;
+ if(i>=list.length){if(rep==1)i=0;else return} if(i<0)i=rep==1?list.length-1:0; load(i)}
+function prevTrack(){if(a.currentTime>3){a.currentTime=0;return}step(-1)}
+
+function addFiles(files){
+ const add=[...files].filter(f=>f.type.startsWith('audio')||/\.(mp3|m4a|wav|ogg|flac|aac)$/i.test(f.name));
+ if(!add.length)return; add.sort((x,y)=>x.name.localeCompare(y.name,undefined,{numeric:true}));
+ const was=list.length; list.push(...add); render();
+ if(idx<0){const last=LS.get('last');const j=list.findIndex(f=>f.name==last);load(j>=0?j:was,false)}
+}
+function render(){
+ $('empty').hidden=!!list.length; const ul=$('list'); ul.innerHTML='';
+ list.forEach((f,i)=>{const li=document.createElement('li');if(i==idx)li.className='cur';
+  li.innerHTML=`<span title="${f.name.replace(/"/g,'&quot;')}"></span><button class="x" title="Remove from playlist">×</button>`;
+  li.firstChild.textContent=(i+1)+'. '+name(f); li.onclick=()=>load(i);
+  li.lastChild.onclick=e=>{e.stopPropagation();if(!confirm(`Remove "${name(f)}" from the playlist?`))return;list.splice(i,1);
+   if(i==idx){a.pause();a.removeAttribute('src');idx=-1;$('title').textContent='No track loaded';$('pos').textContent='';if(list.length)load(Math.min(i,list.length-1),false)}else if(i<idx)idx--;render()};
+  ul.appendChild(li)});
+}
+let dragging=false;
+function tick(){if(!dragging){$('seek').value=a.currentTime}$('cur').textContent=fmt(a.currentTime)}
+function posState(){try{if(a.duration&&'mediaSession' in navigator)navigator.mediaSession.setPositionState({duration:a.duration,playbackRate:a.playbackRate,position:Math.min(a.currentTime,a.duration)})}catch{}}
+
+a.ontimeupdate=()=>{tick();if(Math.floor(a.currentTime)%5==0)savePos()};
+a.onloadedmetadata=()=>{$('seek').max=a.duration;$('dur').textContent=fmt(a.duration);posState()};
+a.onplay=()=>{$('playIco').setAttribute('href','#pause');posState()};
+a.onpause=()=>{$('playIco').setAttribute('href','#play');savePos()};
+a.onended=()=>{positions[list[idx].name]=0;LS.set('pos',positions);if(rep==2){a.currentTime=0;a.play()}else step(1)};
+a.onratechange=()=>{if(Math.abs(a.playbackRate-speed)>.001)a.playbackRate=speed};
+
+const seek=$('seek');
+seek.oninput=()=>{dragging=true;a.currentTime=+seek.value;$('cur').textContent=fmt(seek.value)};
+seek.onchange=()=>{dragging=false;posState()};
+$('vol').oninput=e=>{a.volume=+e.target.value;LS.set('vol',a.volume)};
+$('playBtn').onclick=()=>{if(!a.src){$('file').click();return}a.paused?a.play():a.pause()};
+$('backBtn').onclick=()=>seekBy(-skip); $('fwdBtn').onclick=()=>seekBy(skip);
+$('prevBtn').onclick=prevTrack; $('nextBtn').onclick=()=>step(1);
+$('slower').onclick=()=>setSpeed(speed-.05); $('faster').onclick=()=>setSpeed(speed+.05);
+$('shufBtn').onclick=()=>setShuffle(!shuffle); $('repBtn').onclick=()=>setRep((rep+1)%3);
+$('openBtn').onclick=()=>$('file').click(); $('file').onchange=e=>{addFiles(e.target.files);e.target.value=''};
+$('setBtn').onclick=()=>$('dlg').showModal(); $('closeDlg').onclick=()=>$('dlg').close();
+const app=$('app');
+addEventListener('dragover',e=>{e.preventDefault();app.classList.add('drop')});
+addEventListener('dragleave',e=>{if(!e.relatedTarget)app.classList.remove('drop')});
+addEventListener('drop',e=>{e.preventDefault();app.classList.remove('drop');addFiles(e.dataTransfer.files)});
+addEventListener('keydown',e=>{if(e.target.tagName=='INPUT'&&e.target.type!='range'||e.ctrlKey||e.metaKey||e.altKey)return;
+ const k=e.key;if(k==' '){e.preventDefault();$('playBtn').click()}
+ else if(k=='ArrowLeft'){e.preventDefault();e.shiftKey?prevTrack():seekBy(-skip)}
+ else if(k=='ArrowRight'){e.preventDefault();e.shiftKey?step(1):seekBy(skip)}
+ else if(k=='['||k=='-')setSpeed(speed-.05); else if(k==']'||k=='=')setSpeed(speed+.05)});
+addEventListener('pagehide',savePos);
+
+// Bluetooth / headset / lock screen: next & previous do the timed skip, not a track change
+if('mediaSession' in navigator){const ms=navigator.mediaSession,h=(n,f)=>{try{ms.setActionHandler(n,f)}catch{}};
+ h('play',()=>a.play()); h('pause',()=>a.pause()); h('stop',()=>a.pause());
+ h('previoustrack',()=>seekBy(-skip)); h('nexttrack',()=>seekBy(skip));
+ h('seekbackward',()=>seekBy(-skip)); h('seekforward',()=>seekBy(skip));
+ h('seekto',d=>{a.currentTime=d.seekTime;tick();posState()});}
+
+setTheme(theme); setSkip(skip); setSpeed(speed); setShuffle(shuffle); setRep(rep); render();
+if('serviceWorker' in navigator&&location.protocol.startsWith('http'))navigator.serviceWorker.register('sw.js').catch(()=>{});
+</script>
+</body>
+</html>
