@@ -7,6 +7,8 @@
 <title>MP3 Player</title>
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icon.svg">
+<link rel="apple-touch-icon" href="icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
 <style>
 :root{--bg:#0f1216;--card:#171b21;--alt:#1f252d;--tx:#e9edf2;--tx2:#95a1ae;--bd:#2c343e;--ac:#64748b;--acd:#334155;--act:#94a3b8}
 :root[data-theme=light]{--bg:#f3f4f6;--card:#fff;--alt:#f0f2f5;--tx:#1d2430;--tx2:#5d6875;--bd:#d9dee5;--ac:#475569;--acd:#334155;--act:#475569}
@@ -131,7 +133,7 @@ function setSpeed(s){speed=Math.min(4,Math.max(.25,Math.round(s*100)/100));a.pla
 function setShuffle(v){shuffle=v;LS.set('shuffle',v);$('shufBtn').style.opacity=v?1:.45;$('shufBtn').title='Shuffle: '+(v?'on':'off')}
 function setRep(v){rep=v;LS.set('rep',v);$('repBtn').style.opacity=v?1:.45;$('repTxt').textContent=v==2?'1':'';$('repBtn').title='Repeat: '+['off','all','one'][v]}
 
-function seekBy(d){if(!a.src)return;a.currentTime=Math.min(Math.max(0,a.currentTime+d),a.duration||0);tick()}
+function seekBy(d){if(!a.src)return;a.currentTime=Math.min(Math.max(0,a.currentTime+d),a.duration||0);tick();posState()}
 function savePos(){if(idx<0)return;const n=list[idx].name;positions[n]=a.currentTime;LS.set('pos',positions);LS.set('last',n)}
 function load(i,play=true){
  if(i<0||i>=list.length)return; savePos(); idx=i; const f=list[i];
@@ -139,7 +141,7 @@ function load(i,play=true){
  a.src=URL.createObjectURL(f); a.playbackRate=speed;
  const p=positions[f.name]; if(p>2) a.addEventListener('loadedmetadata',()=>{if(p<a.duration-2)a.currentTime=p},{once:true});
  $('title').textContent=name(f); $('pos').textContent=`Track ${i+1} of ${list.length}`;
- if('mediaSession' in navigator) navigator.mediaSession.metadata=new MediaMetadata({title:name(f),artist:'MP3 Player'});
+ if('mediaSession' in navigator) navigator.mediaSession.metadata=new MediaMetadata({title:name(f),artist:`Track ${i+1} of ${list.length}`,album:'MP3 Player',artwork:[{src:'icon-192.png',sizes:'192x192',type:'image/png'},{src:'icon-512.png',sizes:'512x512',type:'image/png'}]});
  LS.set('last',f.name); render(); if(play) a.play().catch(()=>{});
 }
 function step(d){if(!list.length)return;let i;if(shuffle&&list.length>1){do i=Math.floor(Math.random()*list.length);while(i==idx)}else i=idx+d;
@@ -167,8 +169,10 @@ function posState(){try{if(a.duration&&'mediaSession' in navigator)navigator.med
 
 a.ontimeupdate=()=>{tick();if(Math.floor(a.currentTime)%5==0)savePos()};
 a.onloadedmetadata=()=>{$('seek').max=a.duration;$('dur').textContent=fmt(a.duration);posState()};
-a.onplay=()=>{$('playIco').setAttribute('href','#pause');posState()};
-a.onpause=()=>{$('playIco').setAttribute('href','#play');savePos()};
+const ps=v=>{try{navigator.mediaSession.playbackState=v}catch{}};
+a.onplay=()=>{$('playIco').setAttribute('href','#pause');ps('playing');posState()};
+a.onseeked=posState;
+a.onpause=()=>{$('playIco').setAttribute('href','#play');ps('paused');posState();savePos()};
 a.onended=()=>{positions[list[idx].name]=0;LS.set('pos',positions);if(rep==2){a.currentTime=0;a.play()}else step(1)};
 a.onratechange=()=>{if(Math.abs(a.playbackRate-speed)>.001)a.playbackRate=speed};
 
@@ -196,7 +200,7 @@ addEventListener('pagehide',savePos);
 
 // Bluetooth / headset / lock screen: next & previous do the timed skip, not a track change
 if('mediaSession' in navigator){const ms=navigator.mediaSession,h=(n,f)=>{try{ms.setActionHandler(n,f)}catch{}};
- h('play',()=>a.play()); h('pause',()=>a.pause()); h('stop',()=>a.pause());
+ h('play',()=>a.play()); h('pause',()=>a.pause()); h('stop',()=>{a.pause();a.currentTime=0});
  h('previoustrack',()=>seekBy(-skip)); h('nexttrack',()=>seekBy(skip));
  h('seekbackward',()=>seekBy(-skip)); h('seekforward',()=>seekBy(skip));
  h('seekto',d=>{a.currentTime=d.seekTime;tick();posState()});}
