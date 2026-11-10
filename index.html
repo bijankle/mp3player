@@ -41,6 +41,9 @@ input[type=range]{width:100%;accent-color:var(--ac);height:28px;margin:0}
 ul{list-style:none;margin:0;padding:0}
 li{display:flex;gap:10px;padding:10px 4px;border-top:1px solid var(--bd);cursor:pointer;align-items:center}
 li:first-child{border-top:0}
+li .d{flex:none;font-weight:400;color:var(--tx2);font-size:13px;font-variant-numeric:tabular-nums}
+#libBar{display:flex;align-items:center;gap:8px;margin-bottom:6px}
+#libBar[hidden]{display:none}
 li span{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 li.cur{color:var(--act);font-weight:800}
 li .x{border:0;background:none;color:var(--tx2);cursor:pointer;font-size:18px;padding:0 6px}
@@ -61,6 +64,7 @@ dialog .lbl{margin-top:12px}
  <symbol id="back" viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 3-6.7M3 4v5h5"/></symbol>
  <symbol id="fwd" viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-3-6.7M21 4v5h-5"/></symbol>
  <symbol id="open" viewBox="0 0 24 24"><path d="M3 7h6l2 2h10v10H3zM12 12v5M9.5 14.5h5"/></symbol>
+ <symbol id="note" viewBox="0 0 24 24"><path d="M9 18V5l11-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="17" cy="16" r="3"/></symbol>
  <symbol id="gear" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1L7 17M17 7l2.1-2.1"/></symbol>
  <symbol id="vol" viewBox="0 0 24 24"><path d="M4 9h4l5-4v14l-5-4H4zM16 9a4 4 0 0 1 0 6"/></symbol>
  <symbol id="shuf" viewBox="0 0 24 24"><path d="M3 6h4l10 12h4M3 18h4l3-3.6M14 9.6L17 6h4M18 3l3 3-3 3M18 15l3 3-3 3"/></symbol>
@@ -69,9 +73,11 @@ dialog .lbl{margin-top:12px}
 <div class="wrap" id="app">
  <div class="top">
   <h1>MP3 Player</h1>
-  <button class="btn" id="openBtn" title="Open files"><svg><use href="#open"/></svg></button>
+  <button class="btn" id="dirBtn" title="Choose music folder"><svg><use href="#open"/></svg></button>
+  <button class="btn" id="openBtn" title="Add single files"><svg><use href="#note"/></svg></button>
   <button class="btn" id="setBtn" title="Settings"><svg><use href="#gear"/></svg></button>
   <input type="file" id="file" accept="audio/*,.mp3,.m4a,.wav,.ogg,.flac" multiple hidden>
+  <input type="file" id="dir" webkitdirectory multiple hidden>
  </div>
 
  <div class="card">
@@ -104,8 +110,9 @@ dialog .lbl{margin-top:12px}
  </div>
 
  <div class="card">
+  <div id="libBar" hidden><span class="sub" id="libName" style="flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis"></span><button class="btn" id="rescan" title="Rescan folder">⟳</button></div>
   <ul id="list"></ul>
-  <div class="hint" id="empty">Playlist is empty. Tap the folder button or drop mp3s here.</div>
+  <div class="hint" id="empty">Tap the folder button to choose your music folder. Newest files show at the top.</div>
  </div>
 </div>
 
@@ -125,6 +132,7 @@ let list=[], idx=-1, skip=LS.get('skip',5), speed=LS.get('speed',1), shuffle=LS.
 a.preservesPitch=true; a.volume=LS.get('vol',1); $('vol').value=a.volume;
 
 const fmt=s=>{s=Math.max(0,Math.floor(s||0));const h=Math.floor(s/3600),m=Math.floor(s/60)%60,x=String(s%60).padStart(2,'0');return h?`${h}:${String(m).padStart(2,'0')}:${x}`:`${m}:${x}`};
+const fdate=t=>{const d=new Date(t),n=new Date();return d.toLocaleDateString(undefined,d.getFullYear()==n.getFullYear()?{day:'numeric',month:'short'}:{day:'numeric',month:'short',year:'numeric'})};
 const name=f=>f.name.replace(/\.[^.]+$/,'');
 
 function pills(el,vals,cur,lab,fn){el.querySelectorAll('.pill').forEach(p=>p.remove());vals.forEach(v=>{const b=document.createElement('button');b.className='pill'+(v==cur?' on':'');b.textContent=lab(v);b.onclick=()=>fn(v);el.appendChild(b)})}
@@ -150,17 +158,40 @@ function step(d){if(!list.length)return;let i;if(shuffle&&list.length>1){do i=Ma
  if(i>=list.length){if(rep==1)i=0;else return} if(i<0)i=rep==1?list.length-1:0; load(i)}
 function prevTrack(){if(a.currentTime>3){a.currentTime=0;return}step(-1)}
 
-function addFiles(files){
- const add=[...files].filter(f=>f.type.startsWith('audio')||/\.(mp3|m4a|wav|ogg|flac|aac)$/i.test(f.name));
- if(!add.length)return; add.sort((x,y)=>x.name.localeCompare(y.name,undefined,{numeric:true}));
- const was=list.length; list.push(...add); render();
- if(idx<0){const last=LS.get('last');const j=list.findIndex(f=>f.name==last);load(j>=0?j:was,false)}
+const isAudio=f=>/\.(mp3|m4a|wav|ogg|flac|aac|opus)$/i.test(f.name)||(f.type||'').startsWith('audio');
+function addFiles(files,replace){
+ const add=[...files].filter(isAudio), cur=list[idx];
+ if(replace)list=[]; const key=f=>f.name+'|'+f.size, have=new Set(list.map(key));
+ add.forEach(f=>{if(!have.has(key(f))){have.add(key(f));list.push(f)}});
+ list.sort((x,y)=>y.lastModified-x.lastModified);  // newest at top
+ idx=cur?list.findIndex(f=>key(f)==key(cur)):-1; render();
+ if(idx<0&&list.length){const last=LS.get('last');const j=list.findIndex(f=>f.name==last);load(j>=0?j:0,false)}
 }
+// Music folder: remembered between visits where the browser allows it (desktop Chrome/Edge)
+const db=()=>new Promise((ok,no)=>{const r=indexedDB.open('mp3',1);r.onupgradeneeded=()=>r.result.createObjectStore('kv');r.onsuccess=()=>ok(r.result);r.onerror=no});
+const idb=(k,v)=>db().then(d=>new Promise(ok=>{const t=d.transaction('kv',v===undefined?'readonly':'readwrite').objectStore('kv');const r=v===undefined?t.get(k):t.put(v,k);r.onsuccess=()=>ok(r.result);r.onerror=()=>ok()})).catch(()=>{});
+let dirH=null;
+async function walk(h,out){for await(const e of h.values()){if(e.kind=='file'){if(isAudio(e))out.push(await e.getFile())}else await walk(e,out)}return out}
+async function scan(ask){
+ if(!dirH)return; let st=await dirH.queryPermission({mode:'read'});
+ if(st!='granted'&&ask)st=await dirH.requestPermission({mode:'read'});
+ showLib(st=='granted'?'':' (tap ⟳ to allow access)'); if(st!='granted')return;
+ $('libName').textContent='Scanning '+dirH.name+'…'; const files=await walk(dirH,[]); addFiles(files,true); showLib('');
+}
+function showLib(note){$('libBar').hidden=false;$('libName').textContent=(dirH?dirH.name:LS.get('dirName',''))+' · '+list.length+' files'+note}
+async function pickDir(){
+ if(window.showDirectoryPicker){try{dirH=await showDirectoryPicker({id:'music',startIn:'music'});idb('dir',dirH);scan(true)}catch{}}
+ else $('dir').click();
+}
+$('dirBtn').onclick=pickDir;
+$('dir').onchange=e=>{const f=e.target.files;if(f.length){LS.set('dirName',f[0].webkitRelativePath.split('/')[0]);addFiles(f,true);showLib('')}e.target.value=''};
+$('rescan').onclick=()=>dirH?scan(true):$('dir').click();
+if(window.showDirectoryPicker)idb('dir').then(h=>{if(h){dirH=h;scan(false)}});
 function render(){
  $('empty').hidden=!!list.length; const ul=$('list'); ul.innerHTML='';
  list.forEach((f,i)=>{const li=document.createElement('li');if(i==idx)li.className='cur';
-  li.innerHTML=`<span title="${f.name.replace(/"/g,'&quot;')}"></span><button class="x" title="Remove from playlist">×</button>`;
-  li.firstChild.textContent=(i+1)+'. '+name(f); li.onclick=()=>load(i);
+  li.innerHTML=`<span title="${f.name.replace(/"/g,'&quot;')}"></span><b class="d"></b><button class="x" title="Remove from playlist">×</button>`;
+  li.firstChild.textContent=name(f); li.children[1].textContent=fdate(f.lastModified); li.onclick=()=>load(i);
   li.lastChild.onclick=e=>{e.stopPropagation();if(!confirm(`Remove "${name(f)}" from the playlist?`))return;list.splice(i,1);
    if(i==idx){a.pause();a.removeAttribute('src');idx=-1;$('title').textContent='No track loaded';$('pos').textContent='';if(list.length)load(Math.min(i,list.length-1),false)}else if(i<idx)idx--;render()};
   ul.appendChild(li)});
