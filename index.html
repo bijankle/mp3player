@@ -213,7 +213,7 @@ const seek=$('seek');
 seek.oninput=()=>{dragging=true;a.currentTime=+seek.value;$('cur').textContent=fmt(seek.value)};
 seek.onchange=()=>{dragging=false;posState()};
 $('vol').oninput=e=>{a.volume=+e.target.value;LS.set('vol',a.volume)};
-$('playBtn').onclick=()=>{if(!a.src){$('file').click();return}a.paused?a.play():a.pause()};
+$('playBtn').onclick=()=>{if(!a.src){dirH?scan(true):pickDir();return}a.paused?a.play():a.pause()};
 $('backBtn').onclick=()=>seekBy(-skip); $('fwdBtn').onclick=()=>seekBy(skip);
 $('prevBtn').onclick=prevTrack; $('nextBtn').onclick=()=>step(1);
 $('slower').onclick=()=>setSpeed(speed-.05); $('faster').onclick=()=>setSpeed(speed+.05);
@@ -230,6 +230,7 @@ addEventListener('keydown',e=>{if(e.target.tagName=='INPUT'&&e.target.type!='ran
  else if(k=='ArrowRight'){e.preventDefault();e.shiftKey?step(1):seekBy(skip)}
  else if(k=='['||k=='-')setSpeed(speed-.05); else if(k==']'||k=='=')setSpeed(speed+.05)});
 addEventListener('pagehide',savePos);
+document.addEventListener('visibilitychange',()=>{if(document.hidden)savePos()});
 
 // Bluetooth / headset / lock screen: next & previous do the timed skip, not a track change
 if('mediaSession' in navigator){const ms=navigator.mediaSession,h=(n,f)=>{try{ms.setActionHandler(n,f)}catch{}};
@@ -238,6 +239,7 @@ if('mediaSession' in navigator){const ms=navigator.mediaSession,h=(n,f)=>{try{ms
  h('seekbackward',()=>seekBy(-skip)); h('seekforward',()=>seekBy(skip));
  h('seekto',d=>{a.currentTime=d.seekTime;tick();posState()});}
 
+{const l=LS.get('last');if(l){$('title').textContent=l.replace(/\.[^.]+$/,'');$('pos').textContent=`Last played at ${fmt(positions[l])}. Tap ▶ to choose your folder and carry on.`}}
 setTheme(theme); setSkip(skip); setSpeed(speed); setShuffle(shuffle); setRep(rep); render();
 if('serviceWorker' in navigator&&location.protocol.startsWith('http'))navigator.serviceWorker.register('sw.js').catch(()=>{});
 </script>
